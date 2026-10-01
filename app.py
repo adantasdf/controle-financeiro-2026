@@ -106,41 +106,17 @@ def init_db():
 
 init_db()
 
-# --- SESSÕES PERSISTENTES (RESISTENTE A MOBILE PULL-TO-REFRESH & F5) ---
+# --- SESSÕES PERSISTENTES ---
 def sync_token_to_browser(token: str):
-    js = f"""
-    <script>
-        try {{
-            localStorage.setItem('financas_token', '{token}');
-        }} catch(e) {{}}
-    </script>
-    """
+    js = f""
     components.html(js, height=0)
 
 def clear_browser_token():
-    js = """
-    <script>
-        try {
-            localStorage.removeItem('financas_token');
-        } catch(e) {}
-    </script>
-    """
+    js = ""
     components.html(js, height=0)
 
 def auto_recuperar_sessao_mobile():
-    js = """
-    <script>
-        try {
-            const urlParams = new URLSearchParams(window.location.search);
-            const tokenNaUrl = urlParams.get('s');
-            const tokenStorage = localStorage.getItem('financas_token');
-            if (!tokenNaUrl && tokenStorage) {
-                urlParams.set('s', tokenStorage);
-                window.location.search = urlParams.toString();
-            }
-        } catch(e) {}
-    </script>
-    """
+    js = ""
     components.html(js, height=0)
 
 def criar_sessao(user_id: int, username: str):
@@ -159,7 +135,7 @@ def criar_sessao(user_id: int, username: str):
 
     idx_mes = datetime.now().month - 1
     st.session_state["filtro_meses_mult"] = [MESES[idx_mes]]
-    st.session_state["mostrar_valores"] = False  # Inicia oculto por padrão
+    st.session_state["mostrar_valores"] = False
     sync_token_to_browser(token)
 
 def encerrar_sessao():
@@ -271,15 +247,8 @@ def registrar_usuario(username: str, senha: str):
 def render_auth_page():
     col1, col2, col3 = st.columns([1, 1.8, 1])
     with col2:
-        st.markdown(
-            """
-            <div style="text-align: center; margin-bottom: 20px;">
-                <h2 style="margin-bottom: 2px;">Painel Financeiro 2026</h2>
-                <p style="color: #888888; font-size: 0.95rem; margin-top: 0;">Desenvolvido por André Dantas</p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+        st.header("Painel Financeiro 2026")
+        st.caption("Desenvolvido por André Dantas")
         tab_login, tab_cadastro = st.tabs(["🔐 Entrar", "✨ Criar Conta"])
 
         with tab_login:
@@ -441,10 +410,7 @@ def remover_categoria(categoria: str, meses_alvo: list):
     conn.close()
 
 # --- CARREGAR ESTADO ---
-st.markdown(
-    "<h1 style='text-align: center;'>Painel Financeiro 2026</h1>",
-    unsafe_allow_html=True
-)
+st.title("Painel Financeiro 2026")
 df_desp_raw, df_despesas, df_pago, df_resumo, rendas_dict = carregar_dados()
 
 # --- SELETOR MULTI-MÊS NA BARRA LATERAL ---
@@ -560,7 +526,7 @@ with st.sidebar.expander("🔑 Alterar Senha"):
                 else:
                     st.error(msg)
 
-# --- CONTROLE DE PRIVACIDADE (INICIA OCULTO POR PADRÃO) ---
+# --- CONTROLE DE PRIVACIDADE ---
 if "mostrar_valores" not in st.session_state:
     st.session_state["mostrar_valores"] = False
 
@@ -626,7 +592,6 @@ tab_desktop, tab_mobile, tab_simulador = st.tabs([
 # ABA 1: VISÃO GERAL (TABELA LOGO ABAIXO DOS INDICADORES)
 # ==========================================================
 with tab_desktop:
-    # 1. TABELA DE DESPESAS NO TOPO DA ABA
     st.subheader(f"Tabela de Despesas ({rotulo_acao})")
 
     if not df_despesas.empty:
@@ -713,17 +678,17 @@ with tab_desktop:
 
     st.divider()
 
-    # 2. GRÁFICOS VISUAIS ABAIXO DA TABELA (TÍTULOS CENTRALIZADOS)
+    # 2. GRÁFICOS VISUAIS ABAIXO DA TABELA
     col_graf, col_perfil = st.columns([1, 1])
 
     with col_graf:
-        st.markdown("<h3 style='text-align: center;'>Evolução (Renda vs Gasto)</h3>", unsafe_allow_html=True)
+        st.subheader("Evolução (Renda vs Gasto)")
         fig_evol = px.line(df_resumo_filtrado, x="Mês", y=["Total Gasto", "Renda"], markers=True)
         fig_evol.update_layout(yaxis_tickprefix="R$ ")
         st.plotly_chart(fig_evol, use_container_width=True)
 
     with col_perfil:
-        st.markdown("<h3 style='text-align: center;'>Perfil dos Gastos</h3>", unsafe_allow_html=True)
+        st.subheader("Perfil dos Gastos")
         df_desp_filtrado = df_desp_raw[df_desp_raw["mes"].isin(meses_ativos)].copy()
         if not df_desp_filtrado.empty and df_desp_filtrado["valor"].sum() > 0:
             df_desp_filtrado["Grupo"] = df_desp_filtrado["categoria"].apply(classificar_tipo_despesa)
@@ -738,7 +703,7 @@ with tab_desktop:
             st.info("Nenhum dado para compor a distribuição dos gastos.")
 
 # ====================================================
-# ABA 2: MODO CELULAR / BAIXA RÁPIDA (CARDS & CLICKS)
+# ABA 2: MODO CELULAR (VALORES SEMPRE VISÍVEIS)
 # ====================================================
 with tab_mobile:
     mes_mobile = meses_ativos[0]
@@ -773,7 +738,11 @@ with tab_mobile:
                         alternar_status_pagamento(r["id"], 1)
                         st.rerun()
                 with c_info:
+                    # Valor explícito sempre visível para conferência no celular
                     st.markdown(f"**{r['categoria']}** — :red[**R$ {r['valor']:,.2f}**]")
+
+            total_pendente_mes = pendentes["valor"].sum()
+            st.warning(f"💰 Total a Pagar (Pendências): R$ {total_pendente_mes:,.2f}")
 
         st.markdown("---")
         st.markdown(f"### ✅ Já Pagas ({len(pagas)})")
@@ -786,7 +755,11 @@ with tab_mobile:
                         alternar_status_pagamento(r["id"], 0)
                         st.rerun()
                 with c_info:
+                    # Valor explícito sempre visível
                     st.markdown(f"~{r['categoria']}~ — :green[**R$ {r['valor']:,.2f}**]")
+            
+            total_pago_mes = pagas["valor"].sum()
+            st.success(f"✅ Total Quitado no Mês: R$ {total_pago_mes:,.2f}")
     else:
         st.info("Nenhuma despesa para exibir.")
 
@@ -830,11 +803,6 @@ with tab_simulador:
         st.plotly_chart(fig_proj, use_container_width=True)
 
 # --- ASSINATURA / CRÉDITOS NO RODAPÉ DA SIDEBAR ---
-st.sidebar.markdown("---")
-st.sidebar.markdown(
-    "<div style='text-align: center; color: #888888; font-size: 0.82rem;'>"
-    "🛠️ <b>Sistema desenvolvido por André Dantas</b><br>"
-    "Versão 2026 • Todos os direitos reservados"
-    "</div>",
-    unsafe_allow_html=True
-)
+st.sidebar.divider()
+st.sidebar.caption("🛠️ Sistema desenvolvido por André Dantas")
+st.sidebar.caption("Versão 2026 • Todos os direitos reservados")
